@@ -1,84 +1,61 @@
-import time
-import cv2
-import pyttsx3
-from ultralytics import YOLO
-from scene_interpreter import describe_scene
+def run_camera(mode="guide"):
+    import time
+    import cv2
+    import pyttsx3
+    from ultralytics import YOLO
+    from app.scene_interpreter import describe_scene
 
-# Load YOLO model
-model = YOLO("yolov8n.pt")
+    model = YOLO("yolov8n.pt")
+    engine = pyttsx3.init()
 
-# Init TTS
-engine = pyttsx3.init()
+    cap = cv2.VideoCapture(0)
 
-# Open webcam
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    last_spoken_time = 0
+    speak_interval = 4
+    last_description = ""
 
-if not cap.isOpened():
-    print("Error: could not open webcam.")
-    exit()
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-last_spoken_time = 0
-speak_interval = 4  # minimum seconds between speech
-last_description = ""
+        results = model(frame, verbose=False)
+        detected_objects = []
+        annotated_frame = frame
 
-def add_article(word: str) -> str:
-    if word[0].lower() in "aeiou":
-        return f"an {word}"
-    return f"a {word}"
+        for result in results:
+            boxes = result.boxes
 
-def build_description(objects):
-    unique_objects = list(dict.fromkeys(objects))
+            for box in boxes:
+                class_id = int(box.cls[0])
+                class_name = model.names[class_id]
+                detected_objects.append(class_name)
 
-    if not unique_objects:
-        return "I cannot detect any clear objects right now."
+            annotated_frame = result.plot()
 
-    described = [add_article(obj) for obj in unique_objects]
+        print(detected_objects)
 
-    if len(described) == 1:
-        return f"There is {described[0]} in view."
-    if len(described) == 2:
-        return f"There is {described[0]} and {described[1]} in view."
+        description = describe_scene(detected_objects, mode=mode)
 
-    return "There are " + ", ".join(described[:-1]) + f", and {described[-1]} in view."
+        current_time = time.time()
+        should_speak = (
+            current_time - last_spoken_time >= speak_interval
+            and description != last_description
+        )
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: could not read frame.")
-        break
+        if should_speak:
+            engine.say(description)
+            engine.runAndWait()
+            last_spoken_time = current_time
+            last_description = description
 
-    results = model(frame, verbose=False)
-    detected_objects = []
-    annotated_frame = frame
+        cv2.imshow("Camera", annotated_frame)
 
-    for result in results:
-        boxes = result.boxes
-        for box in boxes:
-            class_id = int(box.cls[0])
-            class_name = model.names[class_id]
-            detected_objects.append(class_name)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
 
-        annotated_frame = result.plot()
-
-    cv2.imshow("Smart Webcam Detection", annotated_frame)
-
-    current_time = time.time()
-    description = describe_scene(detected_objects, mode="guide")
-
-    should_speak = (
-        current_time - last_spoken_time >= speak_interval
-        and description != last_description
-    )
-
-    if should_speak:
-        print(description)
-        engine.say(description)
-        engine.runAndWait()
-        last_spoken_time = current_time
-        last_description = description
-
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+    cap.release()
+    cv2.destroyAllWindows()
+    
+if __name__ == "__main__":
+    run_camera()
