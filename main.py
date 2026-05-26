@@ -1,11 +1,10 @@
 import os
+import base64
+import requests
 from kivy.app import App
 from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
 from plyer import tts, camera
-
-# Import the network client library we used in app.py
-from ollama import Client
 
 class VoiceOverseaApp(App):
     def build(self):
@@ -37,48 +36,53 @@ class VoiceOverseaApp(App):
             # This works on actual smartphones
             camera.take_picture(filename=self.photo_path, on_complete=self.upload_to_server)
         except Exception:
-            # DESKTOP FALLBACK: If running on your laptop, bypass the mobile camera code 
-            # and immediately process the static test photo sitting in D:\voiceOversea
             print("[Desktop Mode] Bypassing mobile camera hardware. Using local test file.")
             self.upload_to_server(self.photo_path)
 
     def upload_to_server(self, filepath):
         if not os.path.exists(filepath):
             self.speak("Error. No image file found to analyze.")
-            print(f"[!] Error: Place an image named '{filepath}' inside D:\\voiceOversea first.")
+            print(f"[!] Error: Image path '{filepath}' does not exist.")
             return
 
         self.speak("Analyzing photo over the network. Please wait.")
         print(f"[Server Workflow] Connecting to your RTX 4090 Ollama server...")
         
         try:
-            # Connect to your local server (localhost works while testing on the same laptop)
-            client = Client(host='http://192.168.0.104:11434')
+            # Android-safe Base64 conversion
+            with open(filepath, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+
+            # Pure Python requests implementation targeting your local IP
+            url = 'http://192.168.0'
+            payload = {
+                "model": "qwen2.5vl:3b",
+                "prompt": "Describe this image concisely for a blind person. Focus strictly on major obstacles or layout.",
+                "images": [encoded_string],
+                "stream": False
+            }
             
-            response = client.generate(
-                model='qwen2.5vl:3b',
-                prompt="Describe this image concisely for a blind person. Focus strictly on major obstacles or layout.",
-                images=[filepath]
-            )
+            response = requests.post(url, json=payload, timeout=30)
             
-            description = response['response']
-            print(f"[Server Output] Result:\n{description}")
-            
-            # Speak the server's description out loud
-            self.speak(description)
+            if response.status_code == 200:
+                description = response.json().get('response', 'No description received.')
+                print(f"[Server Output] Result:\n{description}")
+                self.speak(description)
+            else:
+                self.speak("Server returned an error response.")
+                print(f"[!] Server Error Code: {response.status_code}")
             
         except Exception as e:
             self.speak("Failed to connect to the online server.")
             print(f"[!] Server Communication Error: {e}")
 
     def speak(self, text_string):
-        # Keeps terminal clean and logs exactly what a user would hear
         print(f"[Voice Output]: {text_string}")
         try:
             # Mobile voice engine trigger
             tts.speak(text_string)
         except Exception:
-            # Desktop fallback: Use our working desktop audio module from app.py
+            # Desktop fallback
             import pyttsx3
             engine = pyttsx3.init()
             engine.setProperty('rate', 180)
