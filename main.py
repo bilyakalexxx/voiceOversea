@@ -53,8 +53,10 @@ class VoiceOverseaApp(App):
             with open(filepath, "rb") as image_file:
                 encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
 
-            # Pure Python requests implementation targeting your local IP
-            url = 'http://192.168.0'
+            # DEFEAT CLIPBOARD BUG: Reconstruct the full server IP via a list 
+            ip_segments = ['192', '168', '0', '104']
+            url = f"http://{'.'.join(ip_segments)}:11434/api/generate"
+            
             payload = {
                 "model": "qwen2.5vl:3b",
                 "prompt": "Describe this image concisely for a blind person. Focus strictly on major obstacles or layout.",
@@ -62,6 +64,7 @@ class VoiceOverseaApp(App):
                 "stream": False
             }
             
+            # Send post request to server with a 30-second timeout window
             response = requests.post(url, json=payload, timeout=30)
             
             if response.status_code == 200:
@@ -71,6 +74,7 @@ class VoiceOverseaApp(App):
             else:
                 self.speak("Server returned an error response.")
                 print(f"[!] Server Error Code: {response.status_code}")
+                print(f"[!] Server Raw Response: {response.text}")
             
         except Exception as e:
             self.speak("Failed to connect to the online server.")
@@ -79,15 +83,17 @@ class VoiceOverseaApp(App):
     def speak(self, text_string):
         print(f"[Voice Output]: {text_string}")
         try:
-            # Mobile voice engine trigger
+            # Mobile voice engine trigger (works when compiled to APK)
             tts.speak(text_string)
         except Exception:
-            # Desktop fallback
-            import pyttsx3
-            engine = pyttsx3.init()
-            engine.setProperty('rate', 180)
-            engine.say(text_string)
-            engine.runAndWait()
+            # NATIVE WINDOWS FALLBACK: Safe shell escape to trigger Windows SAPI engine directly
+            import subprocess
+            clean_text = text_string.replace('"', '\\"')
+            powershell_command = f'Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak("{clean_text}")'
+            try:
+                subprocess.run(["powershell.exe", "-Command", powershell_command], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"[!] Desktop TTS Fallback failed: {e}")
 
 if __name__ == '__main__':
     VoiceOverseaApp().run()
