@@ -6,13 +6,16 @@
 [app]
 
 # (str) Title of your application
-title = My Application
+title = voiceOversea
 
 # (str) Package name
-package.name = myapp
+package.name = voiceoversea
 
 # (str) Package domain (needed for android/ios packaging)
-package.domain = org.test
+package.domain = org.assistive
+
+# (list) Android permissions
+android.permissions = INTERNET, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 
 # (str) Source code where the main.py live
 source.dir = .
@@ -42,7 +45,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy
+requirements = python3, kivy==2.3.0, plyer, requests, urllib3, certifi, openssl
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
