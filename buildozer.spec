@@ -31,11 +31,11 @@ android.api = 33
 # (int) Minimum API your APK will support (Android 8.0+)
 android.minapi = 24
 
-# (str) Android NDK directory 
-android.ndk_path = /home/bilya/.buildozer/android/platform/android-ndk-r25c
+# (str) Android NDK directory (Point this cleanly to r27c)
+android.ndk_path = /home/bilya/.buildozer/android/platform/android-ndk-r27c
 
-# (str) Android NDK version (Fully supported online archival link)
-android.ndk = r25c
+# (str) Android NDK version (Fully supported online link)
+android.ndk = r27c
 
 # (list) Android permissions needed for camera and networking
 android.permissions = INTERNET, CAMERA, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
